@@ -2,23 +2,26 @@ import * as fs from "fs";
 import { Inject, Injectable } from "injection-js";
 
 import { ActionKind, BlockNumber, Transaction } from "domain/models";
-import { BasePath, InitialBlockNumber } from "domain/services";
+import { BasePath, InitialBlock } from "domain/services";
 import { StateStore } from "domain/services";
 
+/**
+ * @description: Filesystem wise implementation of the `StateStore`.
+ */
 @Injectable()
 export class FilesystemStateStore extends StateStore<Transaction> {
   constructor(
     @Inject(BasePath) public readonly basePath: string,
-    @Inject(InitialBlockNumber) protected readonly initialBlockNumber: BlockNumber,
+    @Inject(InitialBlock) protected readonly initialBlock: BlockNumber,
   ) {
-    super(initialBlockNumber);
+    super();
   }
 
   public getLastProcessedBlock(kind: ActionKind): Promise<BlockNumber> {
     const path = `${this.basePath}${kind}_PROGRESS.TXT`;
     const options = { encoding: "utf8", flag: "a+" } as const;
     return fs.promises.readFile(path, options)
-      .then(r => r.length ? new BlockNumber(r) : new BlockNumber(this.initialBlockNumber.value - 1));
+      .then(r => r.length ? new BlockNumber(r) : new BlockNumber(this.initialBlock.value - 1));
   }
 
   public updateCurrentBlock(kind: ActionKind, block: BlockNumber): Promise<void> {

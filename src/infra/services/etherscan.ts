@@ -7,7 +7,7 @@ import { BlockNumber, Transaction } from "domain/models";
 import { PollInterval } from "infra/services/config-tokens";
 import { Milliseconds } from "shared/models";
 import {
-  InitialBlockNumber,
+  InitialBlock,
   RegisteredFilterFunctions as RegFilterFns,
   FilterParams,
   TransactionSource,
@@ -17,6 +17,9 @@ export const enum ERROR {
   MALFORMED_TRANSACTION = "MALFORMED_TRANSACTION",
 }
 
+/**
+ * @description Handles transactions retrieval from the etherscan API service
+ */
 @Injectable()
 export class Etherscan extends TransactionSource<Transaction> {
   protected readonly etherscanProvider = new providers.EtherscanProvider("ropsten");
@@ -26,10 +29,10 @@ export class Etherscan extends TransactionSource<Transaction> {
   constructor(
     @Inject(RegFilterFns) protected readonly filterFunctions: RegFilterFns<Transaction>,
     @Inject(FilterParams) protected readonly filterParams: FilterParams,
-    @Inject(InitialBlockNumber) protected readonly initialBlockNumber: BlockNumber,
+    @Inject(InitialBlock) protected readonly initialBlock: BlockNumber,
     @Inject(PollInterval) protected readonly pollInterval: Milliseconds,
   ) {
-    super(filterFunctions, initialBlockNumber);
+    super(filterFunctions, initialBlock);
   }
 
   protected initLatestBlock(): Observable<BlockNumber> {
@@ -40,6 +43,7 @@ export class Etherscan extends TransactionSource<Transaction> {
   }
 
   protected getBlock(block: BlockNumber): Observable<Transaction[]> {
+    // Calculate how much time passed between the last API request and now
     const diff = new Date().getTime() - this.lastFetch.getTime();
     const custody = this.filterParams.custody;
 
@@ -47,6 +51,7 @@ export class Etherscan extends TransactionSource<Transaction> {
       take(1),
       switchMap(() => this.etherscanProvider.getHistory(custody.value, block.value, block.value)),
       switchMap((txs) => checkTransactions(txs) ? of(txs) : throwError(new Error(ERROR.MALFORMED_TRANSACTION))),
+      // Update the last fetch time
       tap(() => this.lastFetch = new Date()),
     );
   }

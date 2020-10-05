@@ -11,7 +11,7 @@ import {
   MintLogger,
   SendLogger,
   FilterParams,
-  InitialBlockNumber,
+  InitialBlock,
   RegisteredFilterFunctions,
   BasePath,
 } from "domain/services";
@@ -19,7 +19,7 @@ import {
 export interface StakeHoundInspectorConfig {
   filterParams: FilterParams;
   pollInterval: Milliseconds;
-  initialBlockNumber: BlockNumber;
+  initialBlock: BlockNumber;
   basePath: string;
 }
 
@@ -47,7 +47,7 @@ export function configureProviders(
     ...defaultProviders,
     { provide: FilterParams, useValue: config.filterParams },
     { provide: PollInterval, useValue: config.pollInterval },
-    { provide: InitialBlockNumber, useValue: config.initialBlockNumber },
+    { provide: InitialBlock, useValue: config.initialBlock },
     { provide: BasePath, useValue: config.basePath },
   ];
 }

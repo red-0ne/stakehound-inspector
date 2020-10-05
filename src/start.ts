@@ -8,6 +8,9 @@ import { MintLogger, SendLogger } from "domain/services";
 import { configureProviders, StakeHoundInspectorConfig, DefaultProviders } from "index";
 import { normalize } from "path";
 
+/**
+ * @description Encapsulates the command line logic so this can be tested
+ */
 export function start(): Subscription {
   const defaultInterval = 3000;
   const defaultInitialBlock = 1618080;
@@ -18,7 +21,7 @@ export function start(): Subscription {
       sender: new EthAddress(process.argv[3]),
     },
     basePath: normalize(`${__dirname}/../data/`),
-    initialBlockNumber: new BlockNumber(process.argv[4] || defaultInitialBlock),
+    initialBlock: new BlockNumber(process.argv[4] || defaultInitialBlock),
     pollInterval: new Milliseconds(process.argv[5] || defaultInterval),
   };
 

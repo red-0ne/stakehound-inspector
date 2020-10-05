@@ -11,18 +11,18 @@ export type RegisteredFilterFunctions<T> = Set<Filter<T, unknown>>;
 export const RegisteredFilterFunctions = new InjectionToken<RegisteredFilterFunctions<unknown>>("RegisteredFilterFunctions");
 
 /**
- * Injection token used to configure the minimum block number from where we start scanning
+ * @description Injection token used to configure the minimum block number from where we start scanning
  * the blockchain.
  */
-export const InitialBlockNumber = new InjectionToken<BlockNumber>("InitialBlockNumber");
+export const InitialBlock = new InjectionToken<BlockNumber>("InitialBlock");
 
 /**
- * Token used to configure the base path where files will be stored to
+ * @description Token used to configure the base path where files will be stored to
  */
 export const BasePath = new InjectionToken<string>("BasePath");
 
 /**
- * Injection token to pass global filtering configuration.
+ * @description Injection token to pass global filtering configuration.
  */
 export interface FilterParams { custody: EthAddress,
   sender: EthAddress,

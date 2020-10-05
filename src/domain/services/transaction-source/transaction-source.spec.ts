@@ -6,7 +6,7 @@ import { BehaviorSubject, interval, Observable, of } from "rxjs";
 import { map, take, takeWhile } from "rxjs/operators";
 
 import { ERROR, TransactionSource } from "./transaction-source";
-import { BlockNumber, BlockTransactions, TransactionStreamConfig } from "domain/models";
+import { BlockNumber, TransactionStreamConfig } from "domain/models";
 
 const blocks = [
   [ "a", "b", "c" ],
@@ -43,20 +43,6 @@ describe("TransactionSource", () => {
     );
   });
 
-  it("should not emit empty blocks", done => {
-    const source = new DummyTransactionSource(new Set(), new BlockNumber(2));
-    let result: BlockTransactions<string>;
-
-    source.block.pipe(take(1)).subscribe(
-      (x) => result = x,
-      (_) => _,
-      () => {
-        expect(result.block.value).to.equal(3);
-        done();
-      }
-    );
-  });
-
   it("should apply filters to all scanned transactions and emit only the passing ones", done => {
     const filterCfg = {
       filters: [
@@ -70,8 +56,8 @@ describe("TransactionSource", () => {
 
     let result = "";
 
-    source.getTransactionStream(filterCfg).pipe(takeWhile(x => x[0] !== "")).subscribe(
-      (v) => result += v,
+    source.getTransactionStream(filterCfg).pipe(takeWhile(x => x.transactions[0] !== "")).subscribe(
+      (v) => result += v.transactions.join(''),
       (_) => _,
       () => {
         expect(result).to.equal("e");
@@ -91,7 +77,7 @@ describe("TransactionSource", () => {
     const filterFn = filterCfg.filters[0].fn;
     const source = new DummyTransactionSource(new Set([ filterFn ]), new BlockNumber(0));
 
-    source.getTransactionStream(filterCfg).pipe(takeWhile(x => x[0] !== "")).subscribe(
+    source.getTransactionStream(filterCfg).pipe(takeWhile(x => x.transactions[0] !== "")).subscribe(
       (_) => _,
       (error: Error) => {
         expect(error.message).to.equal(ERROR.UNKNOWN_FILTER);

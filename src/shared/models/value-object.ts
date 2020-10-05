@@ -3,7 +3,7 @@ export const enum ERROR {
 }
 
 /**
- * Offers a way to define domain values replacing the too generic types like number, string...
+ * @description Offers a way to define domain values replacing the too generic types like number, string...
  * They are generally created from unsafe seed values that get validated and normalized
  * to the correct representation.
  *

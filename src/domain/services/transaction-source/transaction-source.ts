@@ -1,6 +1,6 @@
-import { BehaviorSubject, Observable, throwError, timer } from "rxjs";
+import { BehaviorSubject, combineLatest, Observable, throwError, timer } from "rxjs";
 import { delayWhen, filter, map, publishReplay, refCount, retryWhen, switchMap,
-  take, tap, } from "rxjs/operators";
+  tap, } from "rxjs/operators";
 
 import { BlockNumber, TransactionStreamConfig, BlockTransactions } from "domain/models";
 import { Filter } from "shared/models/filter";
@@ -22,7 +22,7 @@ export abstract class TransactionSource<T> {
    * @description Observable emitting scanned blocks transactions. At boot time, it may emit
    * old blocks starting from the provided `InitialBlockNumber`.
    */
-  public readonly block = this.buildBlockStream(this.initialBlock);
+  public abstract readonly block: Observable<BlockTransactions<T>>;
 
   /**
    * @description Observable representing the latest blockchain block. It will emit each time there
@@ -82,15 +82,18 @@ export abstract class TransactionSource<T> {
     // It has an initial emission of start block number
     const nextBlockController = new BehaviorSubject<BlockNumber>(start);
 
-    return nextBlockController.pipe(
+    return combineLatest([nextBlockController, this.latestBlock]).pipe(
+      // Do not execute the above operators on every new subscription. Store (in-memory) the blocks
+      // and give them back for new subscriptions.
+      publishReplay(),
+
+      // Stop scanning the chain if there is no subscriber
+      refCount(),
       // Delay block retrieval until until it is no longer ahead of the latest block
-      delayWhen(next => this.latestBlock.pipe(
-        filter(latestBlock => next.value <= latestBlock.value),
-        take(1),
-      )),
+      filter(([next, latest]) => next.value <= latest.value),
       // Execute the block retrieval logic implemented by the subclass. It is up to the subclass
       // to cache the retrieved blocks so it has not to scan again the chain on the next run
-      switchMap(next => this.getBlock(next).pipe(
+      switchMap(([next, latest]) => this.getBlock(next).pipe(
         // Retry logic
         retryWhen(errors => errors.pipe(
           // Wait longer exponentially each time there is an error with a maximum of 5 retries
@@ -100,17 +103,12 @@ export abstract class TransactionSource<T> {
             : throwError(error)
           ),
         )),
+        tap(() => console.log(`[latest: ${latest.value}] Block ${next.value} fetched`)),
         // Trigger the retrieval of the next block on the next tick
         tap(() => setTimeout(() => nextBlockController.next(new BlockNumber(next.value + 1)))),
         // Send the transactions array and their corresponding block number
         map(transactions => ({ block: next, transactions })),
       )),
-      // Do not execute the above operators on every new subscription. Store (in-memory) the blocks
-      // and give them back for new subscriptions.
-      publishReplay(),
-
-      // Stop scanning the chain if there is no subscriber
-      refCount(),
     );
   }
 

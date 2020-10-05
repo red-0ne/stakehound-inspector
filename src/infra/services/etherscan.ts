@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "injection-js";
 import { providers } from "ethers";
-import { Observable, of, throwError, timer } from "rxjs";
-import { map, switchMap, take, tap } from "rxjs/operators";
+import { interval, Observable, of, throwError } from "rxjs";
+import { distinctUntilChanged, map, publish, refCount, switchMap, take, tap } from "rxjs/operators";
 
 import { BlockNumber, Transaction } from "domain/models";
 import { PollInterval } from "infra/services/config-tokens";
@@ -25,6 +25,7 @@ export class Etherscan extends TransactionSource<Transaction> {
   protected readonly etherscanProvider = new providers.EtherscanProvider("ropsten");
   protected lastFetch = new Date(0);
   public readonly latestBlock = this.initLatestBlock();
+  public readonly block = this.buildBlockStream(this.initialBlock);
 
   constructor(
     @Inject(RegFilterFns) protected readonly filterFunctions: RegFilterFns<Transaction>,
@@ -36,10 +37,14 @@ export class Etherscan extends TransactionSource<Transaction> {
   }
 
   protected initLatestBlock(): Observable<BlockNumber> {
-    return timer(this.pollInterval.value).pipe(
+    return interval(this.pollInterval.value).pipe(
       switchMap(() => this.etherscanProvider.getBlockNumber()),
-      map(blockNumber => new BlockNumber(blockNumber)),
-    )
+      distinctUntilChanged(),
+      map(block => new BlockNumber(block)),
+      tap(block => console.log(`>>> Latest block updated to ${block.value}`)),
+      publish(),
+      refCount(),
+    );
   }
 
   protected getBlock(block: BlockNumber): Observable<Transaction[]> {
@@ -47,7 +52,7 @@ export class Etherscan extends TransactionSource<Transaction> {
     const diff = new Date().getTime() - this.lastFetch.getTime();
     const custody = this.filterParams.custody;
 
-    return timer(diff >= this.pollInterval.value ? 0 : diff).pipe(
+    return interval(diff >= this.pollInterval.value ? 0 : diff).pipe(
       take(1),
       switchMap(() => this.etherscanProvider.getHistory(custody.value, block.value, block.value)),
       switchMap((txs) => checkTransactions(txs) ? of(txs) : throwError(new Error(ERROR.MALFORMED_TRANSACTION))),

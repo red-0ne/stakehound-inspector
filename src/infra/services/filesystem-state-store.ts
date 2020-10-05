@@ -34,7 +34,8 @@ export class FilesystemStateStore extends StateStore<Transaction> {
     const path = `${this.basePath}${kind}.TXT`;
     const options = { encoding: "utf8", flag: "a+" } as const;
     const type = kind === "SEND" ? "to" : "from";
-    const data = transactions.map(tx => `${kind} ${tx.value} ${tx[type]}`).join("\n") + "\n";
+    const data = transactions.map(tx => `${kind} ${tx.value} ${tx[type]} ${tx.hash}`).join("\n") + "\n";
+    console.log(`Saving ${transactions.length} ${kind} transactions`);
 
     return fs.promises.writeFile(path, data, options);
   }

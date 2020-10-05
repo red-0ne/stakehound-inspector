@@ -15,6 +15,12 @@ npm install
 npm test
 ```
 
+### Generate documentation
+
+```
+npm run gendoc
+```
+
 ### Run
 
 ```

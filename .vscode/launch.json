@@ -5,13 +5,17 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "node",
+      "name": "Stackhound",
+      "type": "pwa-node",
       "request": "launch",
-      "name": "Launch Program",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
-      "program": "${workspaceFolder}/dist/start.js",
+      "runtimeExecutable": "ts-node",
+      "runtimeArgs": ["-r", "tsconfig-paths/register", "-P", "tsconfig.json", "src/start.ts"],
+      "cwd": "${workspaceRoot}",
+      "resolveSourceMapLocations": [
+          "${workspaceFolder}/**",
+          "!**/node_modules/**"
+        ],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "outFiles": [
         "${workspaceFolder}/**/*.js"
       ]

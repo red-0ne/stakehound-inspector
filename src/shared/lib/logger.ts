@@ -1,38 +1,37 @@
-import { from, Observable } from "rxjs";
+import { from, Observable, of } from "rxjs";
 import { switchMap } from "rxjs/operators";
-import { BigNumber, providers } from "ethers";
 
 import { byEthSender } from "domain/filters";
-import { ActionKind, BlockNumber, EthAddress, FilterConfig } from "domain/models";
+import { ActionKind, BlockNumber, EthAddress, FilterConfig, Transaction } from "domain/models";
 import { FilterParams, StateStore, TransactionSource } from "domain/services";
 import { Injectable } from "injection-js";
 
-type R = providers.TransactionReceipt & { value: BigNumber };
-type T = providers.TransactionResponse;
-
 @Injectable()
-export abstract class Logger {
-  public readonly transaction: Observable<R[]>;
-  public readonly buffer = new Map<number, Map<string, R>>();
+export abstract class Logger<T = Transaction> {
+  public readonly transaction: Observable<T[]>;
 
   constructor(
-    protected readonly store: StateStore,
-    protected readonly transactionSource: TransactionSource<R, T>,
+    protected readonly store: StateStore<T>,
+    protected readonly transactionSource: TransactionSource<T>,
     protected readonly filterParams: FilterParams,
     protected readonly actionKind: ActionKind
   ) {
 
-    const filters: FilterConfig<R, EthAddress>[] = [
+    const filters: FilterConfig<Transaction, EthAddress>[] = [
       { fn: byEthSender, context: this.filterParams.sender }
     ];
 
     this.transaction = from(this.store.getLastProcessedBlock(actionKind)).pipe(
       switchMap(last => {
-        const cfg = { start: new BlockNumber(last.value + 1), filters };
+        const next = new BlockNumber(last.value + 1);
+        const cfg = { start: next, filters };
 
         return this.transactionSource.getTransactionStream(cfg).pipe(
-          switchMap(txs => this.store.saveTransactions<R>(this.actionKind, txs).then(() => txs)),
-          switchMap(txs => this.store.updateCurrentBlock(this.actionKind, last).then(() => txs)),
+          switchMap(txs => txs.transactions.length
+            ? this.store.saveTransactions(this.actionKind, txs.transactions).then(() => txs)
+            : of(txs)),
+          switchMap(txs => this.store.updateCurrentBlock(this.actionKind, txs.block)
+            .then(() => txs.transactions)),
         );
       })
     );

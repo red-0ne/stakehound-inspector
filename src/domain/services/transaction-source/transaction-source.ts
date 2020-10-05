@@ -1,6 +1,5 @@
 import { BehaviorSubject, Observable, throwError, timer } from "rxjs";
 import {
-  concatMap,
   delayWhen,
   filter,
   map,
@@ -14,7 +13,6 @@ import {
 
 import { BlockNumber, TransactionStreamConfig, BlockTransactions } from "domain/models";
 import { Filter } from "shared/models/filter";
-import { providers } from "ethers";
 import { Inject, Injectable } from "injection-js";
 import { InitialBlockNumber, RegisteredFilterFunctions } from "domain/services/config-tokens";
 
@@ -24,18 +22,18 @@ export const enum ERROR {
 }
 
 @Injectable()
-export abstract class TransactionSource<R, T = providers.TransactionResponse> {
+export abstract class TransactionSource<T> {
   public readonly block = this.buildBlockStream(this.initialBlockNumber);
-  public readonly latestBlock = this.initLatestBlock();
+  public abstract readonly latestBlock: Observable<BlockNumber>;
 
   constructor(
-    @Inject(RegisteredFilterFunctions) protected readonly filterFunctions: Set<Filter<R, unknown>>,
+    @Inject(RegisteredFilterFunctions) protected readonly filterFunctions: Set<Filter<T, unknown>>,
     @Inject(InitialBlockNumber) protected readonly initialBlockNumber: BlockNumber,
   ) {
   }
 
-  public getTransactionStream({ filters, start }: TransactionStreamConfig<R>): Observable<R[]> {
-    if (!filters.every((f) => this.filterFunctions.has(f.fn))) {
+  public getTransactionStream({ filters, start }: TransactionStreamConfig): Observable<BlockTransactions<T>> {
+    if (!filters.every(f => this.filterFunctions.has(f.fn))) {
       return throwError(new Error(ERROR.UNKNOWN_FILTER));
     }
 
@@ -45,11 +43,10 @@ export abstract class TransactionSource<R, T = providers.TransactionResponse> {
 
     return this.block.pipe(
       filter(blockTransactions => blockTransactions.block.value >= start.value),
-      filter(({ transactions }) => transactions.length !== 0),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      concatMap(({ transactions }) => Promise.all(transactions.map((tx: any) => tx.wait()))),
-      map(transactions => transactions.filter(tx => filters.every(f => f.fn(tx, f.context)))),
-      filter(txs => txs.length !== 0),
+      map(({ transactions, block }) => ({
+        transactions: transactions.filter(tx => filters.every(f => f.fn(tx, f.context))),
+        block,
+      })),
     );
   }
 
@@ -71,7 +68,6 @@ export abstract class TransactionSource<R, T = providers.TransactionResponse> {
         tap(() => setTimeout(() => nextBlockController.next(new BlockNumber(next.value + 1)))),
         map(transactions => ({ block: next, transactions })),
       )),
-      filter(({ transactions }) => transactions.length !== 0),
       publishReplay(),
       refCount(),
     );

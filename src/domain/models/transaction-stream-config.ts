@@ -11,8 +11,8 @@ export interface FilterConfig<T, CTX> {
  *
  * @template T generic type representing a transaction
  */
-export interface TransactionStreamConfig<T> {
+export interface TransactionStreamConfig {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  filters: FilterConfig<T, any>[];
+  filters: FilterConfig<any, any>[];
   start: BlockNumber;
 }

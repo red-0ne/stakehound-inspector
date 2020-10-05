@@ -1,10 +1,9 @@
 import { Filter } from "shared/models";
-import { providers } from "ethers";
 
-import { EthAddress } from "domain/models";
+import { EthAddress, Transaction } from "domain/models";
 
-export const byEthSender: Filter<providers.TransactionReceipt, EthAddress> = (
-  transaction: providers.TransactionReceipt,
+export const byEthSender: Filter<Transaction, EthAddress> = (
+  transaction: Transaction,
   sender: EthAddress
 ): boolean => {
   return transaction.from === sender.value;

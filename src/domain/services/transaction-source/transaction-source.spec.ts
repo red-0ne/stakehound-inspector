@@ -1,33 +1,29 @@
+import "reflect-metadata";
 import "mocha";
 
 import { expect } from "chai";
-import { interval, Observable, of } from "rxjs";
+import { BehaviorSubject, interval, Observable, of } from "rxjs";
 import { map, take, takeWhile } from "rxjs/operators";
 
 import { ERROR, TransactionSource } from "./transaction-source";
-import { BlockNumber, BlockTransactions, TransactionStreamConfig, WaitTx as WTX } from "domain/models";
-import { BigNumber } from "ethers";
-
-function addWaitFn(i: string) {
-  return { val: i, wait: () => Promise.resolve(i), value: BigNumber.from("1") };
-}
-
-type WaitTx = WTX<string> & { val: string };
+import { BlockNumber, BlockTransactions, TransactionStreamConfig } from "domain/models";
 
 const blocks = [
-  [ "a", "b", "c" ].map(addWaitFn),
-  [ "d" ].map(addWaitFn),
-  [].map(addWaitFn),
-  [ "e", "f" ].map(addWaitFn),
-  [ "" ].map(addWaitFn),
+  [ "a", "b", "c" ],
+  [ "d" ],
+  [],
+  [ "e", "f" ],
+  [ "" ],
 ];
 
-class DummyTransactionSource extends TransactionSource<string, WaitTx> {
+class DummyTransactionSource extends TransactionSource<string> {
+  public latestBlock = new BehaviorSubject(new BlockNumber(4));
+
   protected initLatestBlock(): Observable<BlockNumber> {
     return interval(50).pipe(map(i => new BlockNumber(i)));
   }
 
-  protected getBlock(block: BlockNumber): Observable<WaitTx[]> {
+  protected getBlock(block: BlockNumber): Observable<string[]> {
     return of(blocks[block.value]);
   }
 }
@@ -38,7 +34,7 @@ describe("TransactionSource", () => {
     let result = "";
 
     source.block.pipe(take(1)).subscribe(
-      (v) => result += v.transactions.map(tx => tx.val).join(''),
+      (v) => result += v.transactions.map(tx => tx).join(''),
       (_) => _,
       () => {
         expect(result).to.equal("d");
@@ -49,7 +45,7 @@ describe("TransactionSource", () => {
 
   it("should not emit empty blocks", done => {
     const source = new DummyTransactionSource(new Set(), new BlockNumber(2));
-    let result: BlockTransactions<WaitTx>;
+    let result: BlockTransactions<string>;
 
     source.block.pipe(take(1)).subscribe(
       (x) => result = x,
@@ -68,7 +64,7 @@ describe("TransactionSource", () => {
         { fn: (x, ctx: string) => ctx.includes(x), context: "e" },
       ],
       start: new BlockNumber(1),
-    } as TransactionStreamConfig<string>
+    } as TransactionStreamConfig
     const filterFns = filterCfg.filters.map(f => f.fn);
     const source = new DummyTransactionSource(new Set(filterFns), new BlockNumber(0));
 
@@ -91,7 +87,7 @@ describe("TransactionSource", () => {
         { fn: (x, ctx: string) => ctx.includes(x), context: "e" },
       ],
       start: new BlockNumber(1),
-    } as TransactionStreamConfig<string>
+    } as TransactionStreamConfig
     const filterFn = filterCfg.filters[0].fn;
     const source = new DummyTransactionSource(new Set([ filterFn ]), new BlockNumber(0));
 
@@ -105,7 +101,7 @@ describe("TransactionSource", () => {
   });
 
   it("should only allow scans within the initial block", done => {
-    const filterCfg = { filters: [], start: new BlockNumber(0) } as TransactionStreamConfig<string>;
+    const filterCfg = { filters: [], start: new BlockNumber(0) } as TransactionStreamConfig;
     const source = new DummyTransactionSource(new Set(), new BlockNumber(2));
 
     source.getTransactionStream(filterCfg).pipe(take(1)).subscribe(

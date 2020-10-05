@@ -8,6 +8,7 @@
     "start": "ts-node -r tsconfig-paths/register src/start.ts",
     "lint": "eslint 'src/**/*.ts'",
     "typecheck": "tsc -p . --noEmit",
+    "gendoc": "typedoc --out docs src/",
     "build": "tsc -p ."
   },
   "repository": {
@@ -33,6 +34,7 @@
     "ts-mocha": "^7.0.0",
     "ts-node": "^9.0.0",
     "tsconfig-paths": "^3.9.0",
+    "typedoc": "^0.19.2",
     "typescript": "^4.0.3"
   },
   "dependencies": {

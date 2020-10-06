@@ -1,5 +1,5 @@
 import { from, Observable, of } from "rxjs";
-import { switchMap } from "rxjs/operators";
+import { concatMap, switchMap } from "rxjs/operators";
 
 import { byEthSender } from "domain/filters";
 import { ActionKind, BlockNumber, EthAddress, FilterConfig, Transaction } from "domain/models";
@@ -21,19 +21,17 @@ export abstract class Logger<T = Transaction> {
       { fn: byEthSender, context: this.filterParams.sender }
     ];
 
-    this.transaction = from(this.store.getLastProcessedBlock(actionKind)).pipe(
-      switchMap(last => {
-        const next = new BlockNumber(last.value + 1);
-        const cfg = { start: next, filters };
+    this.transaction = from(this.store.getLastProcessedBlock(actionKind)).pipe(switchMap(last => {
+      const next = new BlockNumber(last.value + 1);
+      const cfg = { start: next, filters };
 
-        return this.transactionSource.getTransactionStream(cfg).pipe(
-          switchMap(txs => txs.transactions.length
-            ? this.store.saveTransactions(this.actionKind, txs.transactions).then(() => txs)
-            : of(txs)),
-          switchMap(txs => this.store.updateCurrentBlock(this.actionKind, txs.block)
-            .then(() => txs.transactions)),
-        );
-      })
-    );
+      return this.transactionSource.getTransactionStream(cfg).pipe(
+        concatMap(txs => txs.transactions.length
+          ? this.store.saveTransactions(this.actionKind, txs.transactions).then(() => txs)
+          : of(txs)),
+        concatMap(txs => this.store.updateCurrentBlock(this.actionKind, txs.block)
+          .then(() => txs.transactions)),
+      );
+    }));
   }
 }

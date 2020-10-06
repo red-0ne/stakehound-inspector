@@ -1,7 +1,8 @@
 import { Inject, Injectable } from "injection-js";
 import { providers } from "ethers";
 import { interval, Observable, of, throwError } from "rxjs";
-import { distinctUntilChanged, map, publish, refCount, switchMap, take, tap } from "rxjs/operators";
+import { distinctUntilChanged, exhaustMap, map, publishReplay, refCount, retryWhen, switchMap,
+  take, tap, timeout } from "rxjs/operators";
 
 import { BlockNumber, Transaction } from "domain/models";
 import { PollInterval } from "infra/services/config-tokens";
@@ -38,12 +39,19 @@ export class Etherscan extends TransactionSource<Transaction> {
   }
 
   protected initLatestBlock(): Observable<BlockNumber> {
+    // Since etherscan does not support sockets and push notifications, we go the polling way
+    // As long as there is at least one subscriber to this observable, emit ticks every pollInterval
     return interval(this.pollInterval.value).pipe(
-      switchMap(() => this.etherscanProvider.getBlockNumber()),
+      // We use exhaustMap here, so that if a next tick arrives but the previous request has not
+      // finished executing yet then we ignore the tick giving a chance to the request to finish
+      exhaustMap(() => this.etherscanProvider.getBlockNumber()),
+      // We give the request twice the pollInterval value for it to finish
+      timeout(this.pollInterval.value * 2),
+      // Only emit when there is a different block
       distinctUntilChanged(),
       map(block => new BlockNumber(block)),
       tap(block => console.log(`>>> Latest block updated to ${block.value}`)),
-      publish(),
+      publishReplay(1),
       refCount(),
     );
   }

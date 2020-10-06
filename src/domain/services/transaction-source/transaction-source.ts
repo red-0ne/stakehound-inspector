@@ -1,12 +1,12 @@
-import { BehaviorSubject, combineLatest, Observable, throwError, timer } from "rxjs";
-import { delayWhen, filter, map, publishReplay, refCount, retryWhen, switchMap,
-  tap, } from "rxjs/operators";
+import { BehaviorSubject, Observable, throwError } from "rxjs";
+import { concatMap, exhaustMap, filter, map, retryWhen, shareReplay, takeWhile, tap } from "rxjs/operators";
 
 import { BlockNumber, TransactionStreamConfig, BlockTransactions } from "domain/models";
 import { Filter } from "shared/models/filter";
 import { Inject, Injectable } from "injection-js";
 import { InitialBlock, RegisteredFilterFunctions } from "domain/services/config-tokens";
 import { exponentialBackOffRetryStrategy } from "shared/lib/exponential-back-off-retry-strategy";
+import { Milliseconds } from "shared/models";
 
 export const enum ERROR {
   UNKNOWN_FILTER = "UNKNOWN_FILTER",
@@ -83,33 +83,25 @@ export abstract class TransactionSource<T> {
     // It has an initial emission of start block number
     const nextBlockController = new BehaviorSubject<BlockNumber>(start);
 
-    return combineLatest([nextBlockController, this.latestBlock]).pipe(
+    return this.latestBlock.pipe(
+      // Ignore new blocks until the next block to process reaches the latest block
+      // We then get the new latest block to repeat the process
+      exhaustMap(latest => nextBlockController.pipe(
+        // Delay block retrieval until it is no longer ahead of the latest block
+        takeWhile((next) => next.value <= latest.value),
+        // Execute the block retrieval logic implemented by the subclass. It is up to the subclass
+        // to cache the retrieved blocks so it has not to scan again the chain on the next run
+        concatMap(next => this.getBlock(next).pipe(
+          retryWhen(exponentialBackOffRetryStrategy(5, new Milliseconds(3000))),
+          map(transactions => ({ block: next, transactions })),
+          // Trigger the retrieval of the next block on the next tick
+          tap(({ block }) => nextBlockController.next(new BlockNumber(block.value + 1))),
+          tap(({ block }) => console.log(`[latest: ${latest.value}] Block ${block.value} fetched!`)),
+        )),
+      )),
       // Do not execute the above operators on every new subscription. Store (in-memory) the blocks
       // and give them back for new subscriptions.
-      publishReplay(),
-
-      // Stop scanning the chain if there is no subscriber
-      refCount(),
-      // Delay block retrieval until until it is no longer ahead of the latest block
-      filter(([next, latest]) => next.value <= latest.value),
-      // Execute the block retrieval logic implemented by the subclass. It is up to the subclass
-      // to cache the retrieved blocks so it has not to scan again the chain on the next run
-      switchMap(([next, latest]) => this.getBlock(next).pipe(
-        // Retry logic
-        retryWhen(errors => errors.pipe(
-          // Wait longer exponentially each time there is an error with a maximum of 5 retries
-          // and a starting from 3 seconds
-          delayWhen((error, attempt) => attempt < 5
-            ? timer((Math.pow(2, attempt) * 1000) + 2000)
-            : throwError(error)
-          ),
-        )),
-        tap(() => console.log(`[latest: ${latest.value}] Block ${next.value} fetched`)),
-        // Trigger the retrieval of the next block on the next tick
-        tap(() => setTimeout(() => nextBlockController.next(new BlockNumber(next.value + 1)))),
-        // Send the transactions array and their corresponding block number
-        map(transactions => ({ block: next, transactions })),
-      )),
+      shareReplay(),
     );
   }
 

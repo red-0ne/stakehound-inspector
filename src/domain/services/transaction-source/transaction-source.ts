@@ -6,6 +6,7 @@ import { BlockNumber, TransactionStreamConfig, BlockTransactions } from "domain/
 import { Filter } from "shared/models/filter";
 import { Inject, Injectable } from "injection-js";
 import { InitialBlock, RegisteredFilterFunctions } from "domain/services/config-tokens";
+import { exponentialBackOffRetryStrategy } from "shared/lib/exponential-back-off-retry-strategy";
 
 export const enum ERROR {
   UNKNOWN_FILTER = "UNKNOWN_FILTER",

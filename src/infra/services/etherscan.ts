@@ -12,6 +12,7 @@ import {
   FilterParams,
   TransactionSource,
 } from "domain/services";
+import { exponentialBackOffRetryStrategy } from "shared/lib";
 
 export const enum ERROR {
   MALFORMED_TRANSACTION = "MALFORMED_TRANSACTION",
@@ -54,7 +55,9 @@ export class Etherscan extends TransactionSource<Transaction> {
 
     return interval(diff >= this.pollInterval.value ? 0 : diff).pipe(
       take(1),
-      switchMap(() => this.etherscanProvider.getHistory(custody.value, block.value, block.value)),
+      exhaustMap(() => this.etherscanProvider.getHistory(custody.value, block.value, block.value)),
+      timeout(this.pollInterval.value * 2),
+      retryWhen(exponentialBackOffRetryStrategy(5, new Milliseconds(3000))),
       switchMap((txs) => checkTransactions(txs) ? of(txs) : throwError(new Error(ERROR.MALFORMED_TRANSACTION))),
       // Update the last fetch time
       tap(() => this.lastFetch = new Date()),
@@ -62,6 +65,8 @@ export class Etherscan extends TransactionSource<Transaction> {
   }
 }
 
+// Ugly hack to return a transaction array :'( there should be validation here
+// We should have a Transaction ValueObject and map the unknownTransactions to ours
 function checkTransactions(_: unknown[]): _ is Transaction[] {
   return true;
 }

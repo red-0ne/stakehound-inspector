@@ -49,7 +49,8 @@ export class Etherscan extends TransactionSource<Transaction> {
       timeout(this.pollInterval.value * 2),
       // Only emit when there is a different block
       distinctUntilChanged(),
-      map(block => new BlockNumber(block)),
+      // Sanitize external data
+      map(block => new BlockNumber(block - 12)),
       tap(block => console.log(`>>> Latest block updated to ${block.value}`)),
       publishReplay(1),
       refCount(),

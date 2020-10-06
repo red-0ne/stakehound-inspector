@@ -1,5 +1,6 @@
 # stakehound-inspector
-CLI and libraries for inspecting ether transfers from and to given addresses
+CLI and libraries for inspecting ether transfers from and to given addresses. It uses RxJs library to handle
+event streams.
 
 ## Usage
 
